@@ -1,0 +1,127 @@
+ <?php
+  //function to get all courses and its parent course in a college as course=>subcourse format
+        public function getcourses1 ()
+        {
+            /*
+             * algorithm behind this function
+             * 1.select all courses
+             * 2.store in an array
+             * 3.foreach course
+             * 4. while parentid!=0
+             *  a.select parent course
+             *  b.concatenate name
+             *  c.parentid=current parent id from result
+             * 5.end of while
+             * 6.return name
+            */
+            $collegeid = $this->input->post('collegeid');
+            $fields    = 'id,coursename,parentid';
+            $condition = array(
+                'collegeid' => $collegeid
+            );
+            $rawdata   = $this->db_functions->get_contents('cms_course', $condition);
+            $i         = 0;
+            foreach ( $rawdata as $rawdata1 )
+            {
+                $coursename = $rawdata1['coursename'];
+                while ( $rawdata1['parentid'] != 0 )
+                {
+                    $conditions = array(
+                        'id' => $rawdata1['parentid']
+                    );
+                    $rawdata2   = $this->db_functions->get_contents('cms_course', $conditions);
+                    //                    $coursename .= "(" . $rawdata2[0]['coursename'] . ")";
+                    $temp                 = $coursename;
+                    $coursename           = $rawdata2[0]['coursename'] . ' => ' . $temp; //contcatenating name based on requirement
+                    $rawdata1['parentid'] = $rawdata2[0]['parentid']; //changing parentid
+                }
+                $x[] = array( 'id' => $rawdata1['id'], 'coursename' => $coursename, 'parent' => $rawdata[$i]['parentid'] );
+                $i++;
+            }
+            $data['d'] = json_encode($x);//encode as json
+            $this->load->view('pages/ajaxview', $data);//and send it to you ajax view page
+        }
+
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        //function to get courses and its subcourses
+        public function getcourses ()
+        {
+            /* $query = "select c.coursename as coursename,c.id as category_id,p.id as parent_category_id,p.coursename as parentname from
+                           cms_course as c left join cms_course as p on c.parentid=p.id order by parentname";*/
+            $collgeid  = $this->input->post('collegeid');
+            $condition = array(
+                'c.collegeid' => $collgeid
+            );
+            $columns   = 'c.coursename as coursename,c.id as category_id,p.id as parent_category_id,p.coursename as parentname';
+            $table     = 'cms_course as c';
+            $joins     = array(
+                array(
+                    'table'     => 'cms_course as p',
+                    'condition' => 'c.parentid=p.id',
+                    'jointype'  => 'LEFT'
+                )
+            );
+            $order     = 'parentname';
+            $courses   = $this->db_functions->get_joins_specific($table, $columns, $joins, $condition, $order);
+            $options   = $this->get_options($courses);
+            $keys      = array_keys($options);
+            for ( $i = 0; $i < count($keys); $i++ )
+            {
+                $x[$i]['id']     = $keys[$i];
+                $x[$i]['course'] = $options[$x[$i]['id']];
+            }
+            $data['d'] = json_encode($x);
+            $this->load->view('pages/ajaxview', $data);
+        }
+
+        //function to recursively get  all the courses and subcourses and ts subcourses in their order
+        function get_options ( $array, $parent = "", $indent = "" )
+        {
+            $return = array();
+            foreach ( $array as $key => $val )
+            {
+                if ( $val["parent_category_id"] == $parent )
+                {
+                    $return[$val["category_id"]] = $indent . $val["coursename"];
+                    $return                      = $return + $this->get_options($array, $val["category_id"], $indent . $val['coursename'] . '=>');
+                }
+            }
+            return $return;
+        }
+
+        //function to display courses and sub courses in tree manner
+        public function treeview ()
+        {
+            $collegeid = $this->input->post('collegeid');
+            $data['d'] = $this->display_children($collegeid);
+            $this->load->view('pages/ajaxview', $data);
+        }
+
+        public function display_children ( $colid, $parent = 0, $level = 0 )
+        {
+            $colid = $colid;
+            $query = $this->db->query("select c.id,c.coursename,c.coursedescription,Deriv.count From cms_course as c left outer join
+            (select parentid,count(*) as count from cms_course group by parentid) Deriv on c.id=Deriv.parentid where c.parentid=$parent and c.collegeid=$colid");
+            echo "<ul>";
+            $rows = $query->result_array();
+            foreach ( $rows as $row )
+            {
+                if ( $row['count'] > 0 )
+                {
+                    echo "<li>" . $row['coursename'];
+                    $this->display_children($colid, $row['id'], $level + 1);
+                    echo "</li>";
+                }
+                elseif ( $row['count'] == 0 )
+                {
+                    echo "<li> " . $row['coursename'] . "</li>";
+                }
+                else
+                {
+                    ;
+                }
+            }
+            echo "</ul>";
+        }
+    }
+    ?>
