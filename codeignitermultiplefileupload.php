@@ -19,7 +19,7 @@ function file_upload ( $config, $files )
   'remove_spaces' => TRUE
   );
   
-//in your library
+//in your library create  a library file named MY_Upload and put this into your code
 <?php if(!defined("BASEPATH")){ exit("No direct script access allowed"); }
 
     /**
